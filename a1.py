@@ -1,5 +1,7 @@
+
 def least_cost_path(graph, start, dest, cost):
-    """Find and return a least cost path in graph from start vertex to dest vertex.
+    """
+    Find and return a least cost path in graph from start vertex to dest vertex.
     Efficiency: If E is the number of edges, the run-time is
       O( E log(E) ).
     Args:
@@ -19,4 +21,38 @@ def least_cost_path(graph, start, dest, cost):
         vertex is always start, the last is always dest in the list.
         Any two consecutive vertices correspond to some
         edge in graph.
-"""
+        """
+        reached = {}
+def load_edmonton_graph(filename):
+    """
+    Loads the graph of Edmonton from the given file.
+    Returns two items
+      graph: the instance of the class Graph() corresponding to the
+        directed graph from edmonton-roads-2.0.1.txt
+      location: a dictionary mapping the identifier of a vertex to
+        the pair (lat, lon) of geographic coordinates for that vertex.
+        These should be integers measuring the lat/lon in 100000-ths
+        of a degree.
+    In particular, the return statement in your code should be
+      return graph, location
+    (or whatever name you use for the variables).
+    Note: the vertex identifiers should be converted to integers
+      before being added to the graph and the dictionary.
+      """
+
+class CostDistance:
+    """
+    A class with a method called distance that will return the Euclidean
+    between two given vertices.
+    """
+    def __init__(self, location):
+        """
+        Creates an instance of the CostDistance class and stores the
+        dictionary "location" as a member of this class.
+        """
+
+    def distance(self, e):
+        """
+        Here e is a pair (u,v) of vertices.
+        Returns the Euclidean distance between the two vertices u and v.
+        """
