@@ -2,7 +2,6 @@ from heapviz import *
 from graph import Graph
 from breadth_first_search import breadth_first_search
 
-
 class CostDistance:
     """
     A class with a method called distance that will return the Euclidean
@@ -13,12 +12,16 @@ class CostDistance:
         Creates an instance of the CostDistance class and stores the
         dictionary "location" as a member of this class.
         """
+        self.distance = int()
+        self.location = location
 
     def distance(self, e):
         """
         Here e is a pair (u,v) of vertices.
         Returns the Euclidean distance between the two vertices u and v.
         """
+        return sqrt((v[0]-u[1])**2+(v[1]-u[1])**2)
+
 
 def least_cost_path(graph, start, dest, cost):
     """
@@ -70,3 +73,36 @@ def load_edmonton_graph(filename):
     Note: the vertex identifiers should be converted to integers
     before being added to the graph and the dictionary.
     """
+    # initializes variables
+    vertices = []
+    edges = []
+    location = {}
+
+    # opens filename for reading and iterates through each line in the file
+    # each line is split by a commana delimiter
+    # the type of a line is determine by checking for the start character
+    with open(filename, 'r') as myfile:
+        for line in myfile:
+            lineItems = line.split(',')
+            if (lineItems[0] == 'V'):
+                vertices.append(lineItems[1])
+                location[int(lineItems[1])] = (int(float(lineItems[2])*100000),int(float(lineItems[3])*100000) )
+            elif (lineItems[0] == 'E'):
+                edges.append((lineItems[1], lineItems[2]))
+
+    # create graph with vertices and edges obtained from graph
+    graph = Graph()
+    for v in vertices: graph.add_vertex(v)
+    for e in edges: graph.add_edge(e)
+    for e in edges: graph.add_edge((e[1], e[0]))
+
+    return graph, location
+
+def interaction():
+    request = input().strip().split()
+    start = [request[1], request[2]]
+    end = [request[3], request[4][:-3]]
+
+
+if __name__ == "__main__":
+    # Code for processing route finding requests here
