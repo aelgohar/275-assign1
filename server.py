@@ -1,6 +1,6 @@
 from heapviz import *
 from graph import Graph
-from breadth_first_search import breadth_first_search
+from breadth_first_search import *
 
 class CostDistance:
     """
@@ -12,7 +12,6 @@ class CostDistance:
         Creates an instance of the CostDistance class and stores the
         dictionary "location" as a member of this class.
         """
-        self.distance = int()
         self.location = location
 
     def distance(self, e):
@@ -20,8 +19,11 @@ class CostDistance:
         Here e is a pair (u,v) of vertices.
         Returns the Euclidean distance between the two vertices u and v.
         """
-        return sqrt((v[0]-u[1])**2+(v[1]-u[1])**2)
+        return manhattan_distance(self.location[e[0]], self.location[e[1]])
 
+def manhattan_distance(u, v):
+    # manhattan distance between 2 sets
+    return ((u[0]-v[0])**2+(u[1]-v[1])**2) ** 0.5
 
 def least_cost_path(graph, start, dest, cost):
     """
@@ -51,11 +53,12 @@ def least_cost_path(graph, start, dest, cost):
     events.insert((start, start), 0)
     while len(events) > 0:
         pair, time = events.popmin()
-        if pair[1] != dest:
+        if pair[1] not in reached:
             reached[pair[1]] = pair[0]
             for neighbour in graph.neighbours(pair[1]):
-                events.insert((pair[1], neighbour), time + cost(v, neighbour
-    return reached
+                events.insert((pair[1], neighbour), time + cost.distance((pair[1], neighbour)))
+
+    return(get_path(reached, start, dest))
 
 def load_edmonton_graph(filename):
     """
@@ -77,7 +80,7 @@ def load_edmonton_graph(filename):
     vertices = []
     edges = []
     location = {}
-
+    graph = Graph()
     # opens filename for reading and iterates through each line in the file
     # each line is split by a commana delimiter
     # the type of a line is determine by checking for the start character
@@ -85,24 +88,57 @@ def load_edmonton_graph(filename):
         for line in myfile:
             lineItems = line.split(',')
             if (lineItems[0] == 'V'):
-                vertices.append(lineItems[1])
-                location[int(lineItems[1])] = (int(float(lineItems[2])*100000),int(float(lineItems[3])*100000) )
+                graph.add_vertex(int(lineItems[1]))
+                location[int(lineItems[1])] = (int(float(lineItems[2])*100000),int(float(lineItems[3])*100000))
             elif (lineItems[0] == 'E'):
-                edges.append((lineItems[1], lineItems[2]))
-
-    # create graph with vertices and edges obtained from graph
-    graph = Graph()
-    for v in vertices: graph.add_vertex(v)
-    for e in edges: graph.add_edge(e)
-    for e in edges: graph.add_edge((e[1], e[0]))
+                graph.add_edge((int(lineItems[1]), int(lineItems[2])))
 
     return graph, location
 
 def interaction():
-    request = input().strip().split()
-    start = [request[1], request[2]]
-    end = [request[3], request[4][:-3]]
+    # load graph and location
+    graph, location = load_edmonton_graph("edmonton-roads-2.0.1.txt")
+    cost = CostDistance(location)
 
+    # take in the user's input
+    request = input().strip().split()
+
+    # valid request
+    if request[0] == "R":
+        closestStart = float('inf')
+        closestEnd = float('inf')
+        vertexStart = 0
+        vertexEnd = 0
+        start = (int(request[1]), int(request[2]))
+        end = (int(request[3]), int(request[4][:-4]))
+
+        # finds the closest vertices for start and end
+        for key, value in location.items():
+            if manhattan_distance(start, value) < closestStart:
+                vertexStart = key
+                closestStart = manhattan_distance(start, value)
+            if manhattan_distance(end, value) < closestEnd:
+                vertexEnd = key
+                closestEnd = manhattan_distance(end, value)
+
+        # get path from start to end
+        path = least_cost_path(graph, vertexStart, vertexEnd, cost)
+
+        # print no path if no path found
+        if len(path) == 0:
+            print("N 0")
+        else:
+            # print number of way points
+            print("N %d" % len(path))
+
+            # start communicating
+            if input() == "A":
+                for i in range(len(path)):
+                    print("W %d %d" % (location[path[i]][0], location[path[i]][1]))
+                    if input() != "A":
+                        print("INPUT NOT VALID, BREAKING")
+                        break
+            print("E")
 
 if __name__ == "__main__":
-    # Code for processing route finding requests here
+    interaction()
