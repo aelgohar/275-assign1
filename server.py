@@ -1,6 +1,11 @@
+# Ahmed El Gohary, 1508009
+# Manimeldura De Silva, 1497692
 from heapviz import *
 from graph import Graph
 from breadth_first_search import *
+from serial import Serial
+from time import sleep
+
 
 class CostDistance:
     """
@@ -95,50 +100,104 @@ def load_edmonton_graph(filename):
 
     return graph, location
 
-def interaction():
+def interaction(stringFromSerial, waitForInitialResponse):
     # load graph and location
     graph, location = load_edmonton_graph("edmonton-roads-2.0.1.txt")
     cost = CostDistance(location)
 
     # take in the user's input
-    request = input().strip().split()
+    request = stringFromSerial.strip().split()
+
+    if (waitForInitialResponse == False):
+        # start communicating
+        if request == "A":
+            #for i in range(len(path)):
+            print("W %d %d" % (location[path[i]][0], location[path[i]][1]))
+            out_line = ("W %d %d" % (location[path[i]][0], location[path[i]][1])) + "\n"
+            encoded = out_line.encode("ASCII")
+            ser.write(encoded)
+        else:
+            waitForInitialResponse = True
+            print("E")
+            out_line = "E" + "\n"
+            encoded = out_line.encode("ASCII")
+            ser.write(encoded)
 
     # valid request
-    if request[0] == "R":
-        closestStart = float('inf')
-        closestEnd = float('inf')
-        vertexStart = 0
-        vertexEnd = 0
-        start = (int(request[1]), int(request[2]))
-        end = (int(request[3]), int(request[4][:-4]))
+    if (waitForInitialResponse):
+        if request[0] == "R":
+            waitForInitialResponse = False
+            closestStart = float('inf')
+            closestEnd = float('inf')
+            vertexStart = 0
+            vertexEnd = 0
+            start = (int(request[1]), int(request[2]))
+            end = (int(request[3]), int(request[4]))
 
-        # finds the closest vertices for start and end
-        for key, value in location.items():
-            if manhattan_distance(start, value) < closestStart:
-                vertexStart = key
-                closestStart = manhattan_distance(start, value)
-            if manhattan_distance(end, value) < closestEnd:
-                vertexEnd = key
-                closestEnd = manhattan_distance(end, value)
+            # finds the closest vertices for start and end
+            for key, value in location.items():
+                if manhattan_distance(start, value) < closestStart:
+                    vertexStart = key
+                    closestStart = manhattan_distance(start, value)
+                if manhattan_distance(end, value) < closestEnd:
+                    vertexEnd = key
+                    closestEnd = manhattan_distance(end, value)
 
-        # get path from start to end
-        path = least_cost_path(graph, vertexStart, vertexEnd, cost)
+            # get path from start to end
+            path = least_cost_path(graph, vertexStart, vertexEnd, cost)
 
-        # print no path if no path found
-        if len(path) == 0:
-            print("N 0")
-        else:
-            # print number of way points
-            print("N %d" % len(path))
+            # print no path if no path found
+            if len(path) == 0:
+                print("N 0")
+                out_line = "N 0" + "\n"
+                encoded = out_line.encode("ASCII")
+                ser.write(encoded)
+            else:
+                # print number of way points
+                print("N %d" % len(path))
+                out_line = ("N %d" % len(path)) + "\n"
+                encoded = out_line.encode("ASCII")
+                ser.write(encoded)
 
-            # start communicating
-            if input() == "A":
-                for i in range(len(path)):
-                    print("W %d %d" % (location[path[i]][0], location[path[i]][1]))
-                    if input() != "A":
-                        print("INPUT NOT VALID, BREAKING")
-                        break
-            print("E")
 
 if __name__ == "__main__":
-    interaction()
+    # interaction()
+    # timeout is in seconds, can specify a float like 4.5
+    waitForInitialResponse = True
+    with Serial("/dev/ttyACM0", baudrate=9600, timeout=1) as ser:
+        iteration = 0
+        while True:
+            # infinite loop that echoes all messages from
+            # the arduino to the terminal
+            line = ser.readline()
+            #print("I read byte string:", line)
+
+            if not line:
+                print("timeout, restarting...")
+                waitForInitialResponse = True
+                continue
+
+            line_string = line.decode("ASCII")
+            stripped = line_string.rstrip("\r\n")
+            interaction(stripped, waitForInitialResponse)
+            #print("This is the actual string:", line_string)
+            #print("Stripping off the newline and carriage return")
+            #stripped = line_string.rstrip("\r\n")
+            #print("I read line: ", stripped)
+
+            #print(len(line_string), len(stripped))
+
+            # construct the line you want to print to the
+            # Arduino, don't forget the newline
+            #out_line = "Iteration " + str(iteration) + "\n"
+            #iteration += 1
+
+            #encoded = out_line.encode("ASCII")
+            # now encoded is a byte object we can
+            # write to the arduino
+
+
+            #ser.write(encoded)
+
+            # rest a bit between rounds of communication
+            sleep(2)
