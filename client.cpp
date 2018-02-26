@@ -1,4 +1,4 @@
-  #include <Arduino.h>
+#include <Arduino.h>
 #include <Adafruit_ILI9341.h>
 #include <SD.h>
 #include "consts_and_types.h"
@@ -91,75 +91,92 @@ void process_input() {
   }
 }
 
-bool read_from_serial(char arr[], int delay){
+bool read_from_serial(char arr[], long long delayTime){
   int used = 0; // iterates through the buffer array
-  int time = millis();  // checks delay
-  while(Serial.available()==0){}  // waits
+  long long curtime = millis();  // checks delay
+  int returnVal = 1;
+  Serial.flush();
 
-  if (time < delay){
-    while(true){
-      // Serial.print("reached reading lines");
-      char c = Serial.read(); // read a byte
-      arr[used++] = c;  // add it to array
-      // Serial.print(arr);
-      if(c == '\n'){
-        arr[used]=='\0';  // null terminate it
-        return 0; // did NOT time out
-        break;
+      while((millis() - curtime) <= delayTime){
+        status_message("hello!");
+
+        while(Serial.available()==0){}  // waits
+
+        // Serial.print("reached reading lines");
+        char c = Serial.read(); // read a byte
+        arr[used++] = c;  // add it to array
+        // Serial.print(arr);
+        if(c == '\n'){
+          arr[used]=='\0';  // null terminate it
+          returnVal = 0;// did NOT time out
+
+          break;
+        }
       }
-    }
-  }
 
-  else{return 1;} // timed out
+    //if (millis() - time > delay){return 1;}
+    return returnVal;
+
+  // timed out
 }
 
 void interact_with_server(lon_lat_32 start, lon_lat_32 end){
-  enum {SENDING_REQUEST, WAITING_FOR_NUMBER, RECEIVING_WAYPOINTS, DONE} curr_mode = SENDING_REQUEST;
+  enum {SENDING_REQUEST, WAITING_FOR_NUMBER, RECEIVING_WAYPOINTS, DONE} curr_mode_comm = SENDING_REQUEST;
+  lon_lat_32 tempStart = start;
+  lon_lat_32 tempEnd = end;
 
-
-  while(curr_mode != DONE){
-
-    if (curr_mode = SENDING_REQUEST){
+  while(curr_mode_comm != DONE){
+    if (curr_mode_comm == SENDING_REQUEST){
       Serial.print("R ");
-      Serial.print(start.lat);
+      Serial.print(tempStart.lat);
       Serial.print(" ");
-      Serial.print(start.lon);
+      Serial.print(tempStart.lon);
       Serial.print(" ");
-      Serial.print(end.lat);
+      Serial.print(tempEnd.lat);
       Serial.print(" ");
-      Serial.print(end.lon);
+      Serial.print(tempEnd.lon);
       Serial.println();
-      curr_mode = WAITING_FOR_NUMBER;
+      curr_mode_comm = WAITING_FOR_NUMBER;
+      //status_message("requesting");
+
     }
 
-    if (curr_mode = WAITING_FOR_NUMBER){
+    if (curr_mode_comm == WAITING_FOR_NUMBER){
       char buffer[129];
       bool timed_out = read_from_serial(buffer, 10000);
       if (!timed_out && buffer[0] == 'N'){
         shared.num_waypoints = buffer[2];
         Serial.println('A');
-        curr_mode = RECEIVING_WAYPOINTS;
+        curr_mode_comm = RECEIVING_WAYPOINTS;
+        status_message("recieving waypoints");
+        timed_out = false;
       }
-      else{
-        curr_mode = SENDING_REQUEST;
+      else if (timed_out == true){
+        curr_mode_comm = SENDING_REQUEST;
+        status_message("timed out");
       }
     }
 
-    if (curr_mode = RECEIVING_WAYPOINTS){
+    if (curr_mode_comm == RECEIVING_WAYPOINTS){
+
       char buffer[129];
       // only 1 second delays
-      bool timed_out = read_from_serial(buffer, 1000);
+      bool timed_out = read_from_serial(buffer, 2000);
+      status_message("recieving waypoints 10");
 
-      if (!timed_out && buffer[0] == 'W'){
-        // read way points
-      }
+        if (!timed_out && buffer[0] == 'W'){
+          Serial.println('A');
+          // read way points
+        }
 
-      else if(!timed_out && buffer[0] == 'E'){
-        curr_mode = DONE;
-      }
-      
-      else{
-        curr_mode = SENDING_REQUEST;
+        else if(!timed_out && buffer[0] == 'E'){
+          curr_mode_comm = DONE;
+          status_message("done 1");
+
+        }
+
+      else if (timed_out){
+        curr_mode_comm = SENDING_REQUEST;
       }
     }
   }
@@ -217,7 +234,7 @@ int main() {
       else {
         // if we were waiting for the end point, record it
         // and then communicate with the server to get the path
-        while (digitalRead(clientpins::joy_button_pin) == HIGH) {Serial.print("stuck");}
+        while (digitalRead(clientpins::joy_button_pin) == HIGH) {}
         end = get_cursor_lonlat();
         interact_with_server(start, end);
 

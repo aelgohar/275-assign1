@@ -100,28 +100,13 @@ def load_edmonton_graph(filename):
 
     return graph, location
 
-def interaction(stringFromSerial, waitForInitialResponse):
+
+def interaction(stringFromSerial, waitForInitialResponse, iteration, path, total):
     # load graph and location
     graph, location = load_edmonton_graph("edmonton-roads-2.0.1.txt")
     cost = CostDistance(location)
-
     # take in the user's input
     request = stringFromSerial.strip().split()
-
-    if (waitForInitialResponse == False):
-        # start communicating
-        if request == "A":
-            #for i in range(len(path)):
-            print("W %d %d" % (location[path[i]][0], location[path[i]][1]))
-            out_line = ("W %d %d" % (location[path[i]][0], location[path[i]][1])) + "\n"
-            encoded = out_line.encode("ASCII")
-            ser.write(encoded)
-        else:
-            waitForInitialResponse = True
-            print("E")
-            out_line = "E" + "\n"
-            encoded = out_line.encode("ASCII")
-            ser.write(encoded)
 
     # valid request
     if (waitForInitialResponse):
@@ -145,7 +130,7 @@ def interaction(stringFromSerial, waitForInitialResponse):
 
             # get path from start to end
             path = least_cost_path(graph, vertexStart, vertexEnd, cost)
-
+            iteration = len(path)
             # print no path if no path found
             if len(path) == 0:
                 print("N 0")
@@ -159,11 +144,32 @@ def interaction(stringFromSerial, waitForInitialResponse):
                 encoded = out_line.encode("ASCII")
                 ser.write(encoded)
 
+    else:
+        # start communicating
+        print(iteration)
+        if request[0] == "A" and iteration:
+            #print("W %d %d" % (location[path[total-iteration]][0], location[path[total-iteration]][1]))
+            out_line = ("W %d %d" % (location[path[total-iteration]][0], location[path[total-iteration]][1])) + "\n"
+            encoded = out_line.encode("ASCII")
+            ser.write(encoded)
+            iteration = iteration-1
+        elif request[0] == "A" and not iteration:
+            waitForInitialResponse = True
+            print("E")
+            out_line = "E" + "\n"
+            encoded = out_line.encode("ASCII")
+            ser.write(encoded)
+        else:
+            waitForInitialResponse = True
+
+    return waitForInitialResponse, iteration, path, len(path)
 
 if __name__ == "__main__":
-    # interaction()
+    #interaction()
     # timeout is in seconds, can specify a float like 4.5
     waitForInitialResponse = True
+    path = None
+    total = 0
     with Serial("/dev/ttyACM0", baudrate=9600, timeout=1) as ser:
         iteration = 0
         while True:
@@ -179,8 +185,8 @@ if __name__ == "__main__":
 
             line_string = line.decode("ASCII")
             stripped = line_string.rstrip("\r\n")
-            interaction(stripped, waitForInitialResponse)
-            #print("This is the actual string:", line_string)
+            print("This is the actual string:", line_string)
+            waitForInitialResponse, iteration, path, total = interaction(stripped, waitForInitialResponse, iteration, path, total)
             #print("Stripping off the newline and carriage return")
             #stripped = line_string.rstrip("\r\n")
             #print("I read line: ", stripped)
