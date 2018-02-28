@@ -98,7 +98,7 @@ bool read_from_serial(char arr[], long long delayTime){
   Serial.flush();
 
       while((millis() - curtime) <= delayTime){
-        status_message("hello!");
+        // status_message("hello!");
 
         while(Serial.available()==0){}  // waits
 
@@ -124,7 +124,7 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
   enum {SENDING_REQUEST, WAITING_FOR_NUMBER, RECEIVING_WAYPOINTS, DONE} curr_mode_comm = SENDING_REQUEST;
   lon_lat_32 tempStart = start;
   lon_lat_32 tempEnd = end;
-
+  int iteration;
   while(curr_mode_comm != DONE){
     if (curr_mode_comm == SENDING_REQUEST){
       Serial.print("R ");
@@ -134,8 +134,7 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       Serial.print(" ");
       Serial.print(tempEnd.lat);
       Serial.print(" ");
-      Serial.print(tempEnd.lon);
-      Serial.println();
+      Serial.println(tempEnd.lon);
       curr_mode_comm = WAITING_FOR_NUMBER;
       //status_message("requesting");
 
@@ -145,10 +144,14 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       char buffer[129];
       bool timed_out = read_from_serial(buffer, 10000);
       if (!timed_out && buffer[0] == 'N'){
+        status_message("recieving waypoints");
         shared.num_waypoints = buffer[2];
+        iteration = shared.num_waypoints;
+        if(shared.num_waypoints >= max_waypoints){
+          curr_mode_comm = DONE;
+        }
         Serial.println('A');
         curr_mode_comm = RECEIVING_WAYPOINTS;
-        status_message("recieving waypoints");
         timed_out = false;
       }
       else if (timed_out == true){
@@ -162,12 +165,22 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       char buffer[129];
       // only 1 second delays
       bool timed_out = read_from_serial(buffer, 2000);
-      status_message("recieving waypoints 10");
+      status_message("recieving waypoints");
 
-        if (!timed_out && buffer[0] == 'W'){
-          Serial.println('A');
-          // read way points
-        }
+      if (!timed_out && buffer[0] == 'W'){
+        Serial.println('A');
+        char temp_lon[8];
+        memcpy(temp_lon, &buffer[2], 7);
+        int32_t templon = atoi(temp_lon);
+
+        char temp_lat[10];
+        memcpy(temp_lon, &buffer[10], 9);
+        int32_t templat = atoi(temp_lat);
+
+        shared.waypoints[shared.num_waypoints - iteration].lon = templon;
+        shared.waypoints[shared.num_waypoints - iteration].lat = templat;
+        --iteration;
+      }
 
         else if(!timed_out && buffer[0] == 'E'){
           curr_mode_comm = DONE;
@@ -178,6 +191,7 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       else if (timed_out){
         curr_mode_comm = SENDING_REQUEST;
       }
+
     }
   }
 }
@@ -237,11 +251,17 @@ int main() {
         while (digitalRead(clientpins::joy_button_pin) == HIGH) {}
         end = get_cursor_lonlat();
         interact_with_server(start, end);
+        for (int z = 0; z < shared.num_waypoints-1; z++){
+          
+          char * xd;
+          itoa(shared.waypoints[z].lon,xd, 10);
+          status_message(xd);
+          tft.drawLine((longitude_to_x(shared.map_number, shared.waypoints[z].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z].lat)),
+          (longitude_to_x(shared.map_number, shared.waypoints[z+1].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z+1].lat)), ILI9341_BLACK);
 
-        // now we have stored the path length in
-        // shared.num_waypoints and the waypoints themselves in
-        // the shared.waypoints[] array, switch back to asking for the
-        // start point of a new request
+        }
+
+
         curr_mode = WAIT_FOR_START;
 
         // wait until the joystick button is no longer pushed
