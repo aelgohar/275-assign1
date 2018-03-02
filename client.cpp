@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Adafruit_ILI9341.h>
 #include <SD.h>
+#include <stdlib.h>
 #include "consts_and_types.h"
 #include "map_drawing.h"
 
@@ -137,7 +138,7 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       bool timed_out = read_from_serial(buffer, 10000);
       if (!timed_out && buffer[0] == 'N'){
         status_message("recieving number");
-        shared.num_waypoints = buffer[2];
+        shared.num_waypoints = (int16_t)atoi(&buffer[2]);
         iteration = shared.num_waypoints;
         if(shared.num_waypoints >= max_waypoints){
           curr_mode_comm = DONE;
@@ -182,12 +183,17 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
   }
 }
 void drawPath(lon_lat_32 start, lon_lat_32 end){
+  // int32_t x1 = longitude_to_x(shared.map_number, start.lon) - shared.map_coords.x;
+  // int32_t x2 = longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x;
+  // int32_t y1 = latitude_to_y(shared.map_number, start.lon) - shared.map_coords.y;
+  // int32_t y2 = latitude_to_y(shared.map_number, end.lon) - shared.map_coords.y;
   int32_t x1 = constrain(longitude_to_x(shared.map_number, start.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
   int32_t x2 = constrain(longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
   int32_t y1 = constrain(latitude_to_y(shared.map_number, start.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
   int32_t y2 = constrain(latitude_to_y(shared.map_number, end.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
   shared.tft->drawLine(x1, y1, x2, y2, ILI9341_BLUE);
 }
+
 int main() {
   setup();
 
@@ -245,10 +251,11 @@ int main() {
         interact_with_server(start, end);
 
         status_message("here");
-        for (int z = 0; z < 1; z++){
+        for (int z = 0; z < shared.num_waypoints - 1; z++){
           // shared.tft->drawLine((longitude_to_x(shared.map_number, shared.waypoints[z].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z].lat)),
           // (longitude_to_x(shared.map_number, shared.waypoints[z+1].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z+1].lat)), ILI9341_BLUE);
           drawPath(shared.waypoints[z], shared.waypoints[z+1]);
+          status_message(String(shared.waypoints[z].lat).c_str());
         }
 
 
