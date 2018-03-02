@@ -107,7 +107,6 @@ bool read_from_serial(char arr[], long long delayTime){
     if(c == '\n'){
       arr[used]=='\0';  // null terminate it
       returnVal = 0;// did NOT time out
-
       break;
     }
   }
@@ -137,7 +136,6 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       char buffer[129];
       bool timed_out = read_from_serial(buffer, 10000);
       if (!timed_out && buffer[0] == 'N'){
-        status_message("recieving number");
         shared.num_waypoints = (int16_t)atoi(&buffer[2]);
         iteration = shared.num_waypoints;
         if(shared.num_waypoints >= max_waypoints){
@@ -155,17 +153,17 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       char buffer[129];
       // only 1 second delays
       bool timed_out = read_from_serial(buffer, 2000);
-      status_message("recieving waypoints");
+      //status_message("recieving waypoints");
 
       if (!timed_out && buffer[0] == 'W'){
         Serial.println('A');
         char* endp;
-        int32_t temp_lon = strtol(&buffer[2], &endp, 10);
-        int32_t temp_lat = strtol(endp, NULL, 10);
+        int32_t temp_lat = strtol(&buffer[2], &endp, 10);
+        int32_t temp_lon = strtol(endp, NULL, 10);
 
         shared.waypoints[shared.num_waypoints - iteration].lon = temp_lon;
         shared.waypoints[shared.num_waypoints - iteration--].lat = temp_lat;
-        status_message("waypoints");
+
       }
 
       else if(buffer[0] == 'E'){
@@ -183,14 +181,11 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
   }
 }
 void drawPath(lon_lat_32 start, lon_lat_32 end){
-  // int32_t x1 = longitude_to_x(shared.map_number, start.lon) - shared.map_coords.x;
-  // int32_t x2 = longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x;
-  // int32_t y1 = latitude_to_y(shared.map_number, start.lon) - shared.map_coords.y;
-  // int32_t y2 = latitude_to_y(shared.map_number, end.lon) - shared.map_coords.y;
-  int32_t x1 = constrain(longitude_to_x(shared.map_number, start.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
-  int32_t x2 = constrain(longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
-  int32_t y1 = constrain(latitude_to_y(shared.map_number, start.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
-  int32_t y2 = constrain(latitude_to_y(shared.map_number, end.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
+
+  int32_t x1 = longitude_to_x(shared.map_number,start.lon) - shared.map_coords.x;
+  int32_t x2 = longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x;
+  int32_t y1 = latitude_to_y(shared.map_number, start.lat) - shared.map_coords.y;
+  int32_t y2 = latitude_to_y(shared.map_number, end.lat) - shared.map_coords.y;
   shared.tft->drawLine(x1, y1, x2, y2, ILI9341_BLUE);
 }
 
@@ -232,7 +227,6 @@ int main() {
 
     // if the joystick button was clicked
     if (shared.joy_button_pushed) {
-
       if (curr_mode == WAIT_FOR_START) {
         // if we were waiting for the start point, record it
         // and indicate we are waiting for the end point
@@ -246,19 +240,10 @@ int main() {
       else {
         // if we were waiting for the end point, record it
         // and then communicate with the server to get the path
-        while (digitalRead(clientpins::joy_button_pin) == HIGH) {}
         end = get_cursor_lonlat();
+
         interact_with_server(start, end);
-
-        status_message("here");
-        for (int z = 0; z < shared.num_waypoints - 1; z++){
-          // shared.tft->drawLine((longitude_to_x(shared.map_number, shared.waypoints[z].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z].lat)),
-          // (longitude_to_x(shared.map_number, shared.waypoints[z+1].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z+1].lat)), ILI9341_BLUE);
-          drawPath(shared.waypoints[z], shared.waypoints[z+1]);
-          status_message(String(shared.waypoints[z].lat).c_str());
-        }
-
-
+        shared.redraw_map = 1;
         curr_mode = WAIT_FOR_START;
 
         // wait until the joystick button is no longer pushed
@@ -280,6 +265,11 @@ int main() {
       draw_cursor();
 
       // TODO: draw the route if there is one
+      status_message("here");
+      for (int z = 0; z < shared.num_waypoints - 1; z++){
+        drawPath(shared.waypoints[z], shared.waypoints[z+1]);
+        //status_message(String(shared.waypoints[z].lat).c_str());
+      }
     }
   }
 
