@@ -96,28 +96,21 @@ bool read_from_serial(char arr[], long long delayTime){
   long long curtime = millis();  // checks delay
   int returnVal = 1;
   Serial.flush();
+  while((millis() - curtime) <= delayTime){
+    while(Serial.available()==0){}  // waits
 
-      while((millis() - curtime) <= delayTime){
-        // status_message("hello!");
+    // Serial.print("reached reading lines");
+    char c = Serial.read(); // read a byte
+    arr[used++] = c;  // add it to array
+    // Serial.print(arr);
+    if(c == '\n'){
+      arr[used]=='\0';  // null terminate it
+      returnVal = 0;// did NOT time out
 
-        while(Serial.available()==0){}  // waits
-
-        // Serial.print("reached reading lines");
-        char c = Serial.read(); // read a byte
-        arr[used++] = c;  // add it to array
-        // Serial.print(arr);
-        if(c == '\n'){
-          arr[used]=='\0';  // null terminate it
-          returnVal = 0;// did NOT time out
-
-          break;
-        }
-      }
-
-    //if (millis() - time > delay){return 1;}
-    return returnVal;
-
-  // timed out
+      break;
+    }
+  }
+  return returnVal;
 }
 
 void interact_with_server(lon_lat_32 start, lon_lat_32 end){
@@ -125,7 +118,8 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
   lon_lat_32 tempStart = start;
   lon_lat_32 tempEnd = end;
   int iteration;
-  while(curr_mode_comm != DONE){
+
+  while(true){
     if (curr_mode_comm == SENDING_REQUEST){
       Serial.print("R ");
       Serial.print(tempStart.lat);
@@ -136,15 +130,13 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
       Serial.print(" ");
       Serial.println(tempEnd.lon);
       curr_mode_comm = WAITING_FOR_NUMBER;
-      //status_message("requesting");
-
     }
 
-    if (curr_mode_comm == WAITING_FOR_NUMBER){
+    else if (curr_mode_comm == WAITING_FOR_NUMBER){
       char buffer[129];
       bool timed_out = read_from_serial(buffer, 10000);
       if (!timed_out && buffer[0] == 'N'){
-        status_message("recieving waypoints");
+        status_message("recieving number");
         shared.num_waypoints = buffer[2];
         iteration = shared.num_waypoints;
         if(shared.num_waypoints >= max_waypoints){
@@ -152,16 +144,13 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
         }
         Serial.println('A');
         curr_mode_comm = RECEIVING_WAYPOINTS;
-        timed_out = false;
       }
-      else if (timed_out == true){
+      else if (timed_out){
         curr_mode_comm = SENDING_REQUEST;
-        status_message("timed out");
       }
     }
 
-    if (curr_mode_comm == RECEIVING_WAYPOINTS){
-
+    else if (curr_mode_comm == RECEIVING_WAYPOINTS){
       char buffer[129];
       // only 1 second delays
       bool timed_out = read_from_serial(buffer, 2000);
@@ -169,33 +158,36 @@ void interact_with_server(lon_lat_32 start, lon_lat_32 end){
 
       if (!timed_out && buffer[0] == 'W'){
         Serial.println('A');
-        char temp_lon[8];
-        memcpy(temp_lon, &buffer[2], 7);
-        int32_t templon = atoi(temp_lon);
+        char* endp;
+        int32_t temp_lon = strtol(&buffer[2], &endp, 10);
+        int32_t temp_lat = strtol(endp, NULL, 10);
 
-        char temp_lat[10];
-        memcpy(temp_lon, &buffer[10], 9);
-        int32_t templat = atoi(temp_lat);
-
-        shared.waypoints[shared.num_waypoints - iteration].lon = templon;
-        shared.waypoints[shared.num_waypoints - iteration].lat = templat;
-        --iteration;
+        shared.waypoints[shared.num_waypoints - iteration].lon = temp_lon;
+        shared.waypoints[shared.num_waypoints - iteration--].lat = temp_lat;
+        status_message("waypoints");
       }
 
-        else if(!timed_out && buffer[0] == 'E'){
-          curr_mode_comm = DONE;
-          status_message("done 1");
-
-        }
+      else if(buffer[0] == 'E'){
+        curr_mode_comm = DONE;
+      }
 
       else if (timed_out){
+        status_message("timed out1");
         curr_mode_comm = SENDING_REQUEST;
       }
-
+    }
+    else if (curr_mode_comm == DONE){
+      break;
     }
   }
 }
-
+void drawPath(lon_lat_32 start, lon_lat_32 end){
+  int32_t x1 = constrain(longitude_to_x(shared.map_number, start.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
+  int32_t x2 = constrain(longitude_to_x(shared.map_number, end.lon) - shared.map_coords.x , 0 , displayconsts::display_width);
+  int32_t y1 = constrain(latitude_to_y(shared.map_number, start.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
+  int32_t y2 = constrain(latitude_to_y(shared.map_number, end.lon) - shared.map_coords.y , 0 , displayconsts::display_height);
+  shared.tft->drawLine(x1, y1, x2, y2, ILI9341_BLUE);
+}
 int main() {
   setup();
 
@@ -251,14 +243,12 @@ int main() {
         while (digitalRead(clientpins::joy_button_pin) == HIGH) {}
         end = get_cursor_lonlat();
         interact_with_server(start, end);
-        for (int z = 0; z < shared.num_waypoints-1; z++){
-          
-          char * xd;
-          itoa(shared.waypoints[z].lon,xd, 10);
-          status_message(xd);
-          tft.drawLine((longitude_to_x(shared.map_number, shared.waypoints[z].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z].lat)),
-          (longitude_to_x(shared.map_number, shared.waypoints[z+1].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z+1].lat)), ILI9341_BLACK);
 
+        status_message("here");
+        for (int z = 0; z < 1; z++){
+          // shared.tft->drawLine((longitude_to_x(shared.map_number, shared.waypoints[z].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z].lat)),
+          // (longitude_to_x(shared.map_number, shared.waypoints[z+1].lon)), (latitude_to_y(shared.map_number, shared.waypoints[z+1].lat)), ILI9341_BLUE);
+          drawPath(shared.waypoints[z], shared.waypoints[z+1]);
         }
 
 
